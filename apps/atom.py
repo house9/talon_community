@@ -2,20 +2,21 @@
 Make sure to install the talon plugin: https://github.com/tuomassalo/atom-talon
 """
 
-import time
 import re
+import time
 
-from talon.voice import Key, press, Str, Context, Rule
+from talon.voice import Context, Key, Rule, Str, press
+
+from .. import utils
 from ..utils import (
-    parse_words_as_integer,
+    extract_num_from_m,
     numeral_map,
     numerals,
     optional_numerals,
-    extract_num_from_m,
-    text,
+    parse_words_as_integer,
     remove_dragon_junk,
+    text,
 )
-from .. import utils
 
 ctx = Context("atom", bundle="com.github.atom")
 
@@ -57,7 +58,8 @@ def jump_to_bol(m):
     if line:
         press("escape")
         press("ctrl-g")
-        Str(str(line))(None)
+        # Str(str(line))(None)
+        utils.paste_text(line)
         press("enter")
 
 
@@ -117,25 +119,35 @@ def execute_atom_command(command, parameters=None):
 
 
 def find_next(m):
-    execute_atom_command(
-        COMMANDS.FIND_NEXT, remove_dragon_junk(get_first_word(m)).lower()
-    )
+    text = "".join(utils.parse_words(m)).lower()
+    if text:
+        execute_atom_command(COMMANDS.FIND_NEXT, text)
 
 
 def find_previous(m):
-    execute_atom_command(
-        COMMANDS.FIND_PREVIOUS, remove_dragon_junk(get_first_word(m)).lower()
-    )
+    text = "".join(utils.parse_words(m)).lower()
+    if text:
+        execute_atom_command(COMMANDS.FIND_PREVIOUS, text)
 
 
 def duplicate_line(m):
     line = extract_num_from_m(m)
+    # press("cmd-right")
+    # press("cmd-left")
+    # press("cmd-left")
     execute_atom_command(COMMANDS.COPY_LINE, str(line))
+    # press("backspace")
+    press("tab")
 
 
 def move_line(m):
     line = extract_num_from_m(m)
     execute_atom_command(COMMANDS.MOVE_LINE, str(line))
+
+
+def move_to_line(m):
+    cut_line(None)
+    paste_line(m)
 
 
 def select_lines(m):
@@ -225,6 +237,7 @@ snippets = {
     "define command": "definecommand",
     "define class": "class",
     "doc string": "docstring",
+    "self assign": "selfassign",
     "for loop": "forloop",
     "print": "print",
     "import": "import",
@@ -233,13 +246,31 @@ snippets = {
     "dictionary": "dict",
     "if name main": "ifnamemain",
     "if name main main": "ifnamemainmain",
+    "unit test class": "unittestclass",
+    "define test class": "unittestclass",
+}
+snippet_formatters = {
+    "define function": utils.snake_text,
+    "define method": utils.snake_text,
+    "define property": utils.snake_text,
+    "define command": utils.snake_text,
+    "self assign": utils.snake_text,
 }
 
 
 def code_snippet(m):
-    words = " ".join([str(word).lower() for word in m._words[1:]])
-    Str(snippets[words])(None)
+    snippet_key = " ".join(m["atom.snippets"])
+    utils.insert(snippets[snippet_key])
     press("tab")
+
+
+def code_snippet_with_formatter(m):
+    snippet_key = " ".join(m["atom.snippets_with_formatter"])
+    utils.insert(snippets[snippet_key])
+    press("tab")
+    if utils.parse_words(m):
+        utils.snake_text(m)
+        press("tab")
 
 
 def code_snippet_naked(m):
@@ -284,6 +315,12 @@ def replace_left_of_equals_with_return(m):
     press("up")
 
 
+def open_fuzzy_file(m):
+    press("cmd-t")
+    text(m)
+    press("enter")
+
+
 keymap = {
     "sprinkle" + optional_numerals: jump_to_bol,
     # 'spring' + optional_numerals: jump_to_eol_and(jump_to_beginning_of_text),
@@ -303,7 +340,7 @@ keymap = {
     # 'snipple': [Key(atom_hotkey), Key(COMMANDS.DELETE_TO_BOL)],
     # 'snipper': [Key(atom_hotkey), Key(COMMANDS.DELETE_TO_EOL)],
     "(duplicate line | clonesert)" + numerals: duplicate_line,
-    "move line" + numerals: move_line,
+    "move line from" + numerals: move_line,
     "crew <dgndictation>": find_next,
     "trail <dgndictation>": find_previous,
     "replace next": Key("cmd-alt-e"),
@@ -314,7 +351,7 @@ keymap = {
     "sprinkoon" + numerals: jump_to_eol_and(lambda: press("enter")),
     "peach": Key("cmd-t"),
     "peach <dgndictation>": [Key("cmd-t"), text],
-    "peachy <dgndictation>": [Key("cmd-t"), text, Key("enter")],
+    "peachy <dgndictation>": open_fuzzy_file,
     "advanced open file": Key("cmd-alt-o"),
     "(pain | bang)" + numerals: change_pain,
     "tab" + numerals: jump_tab,
@@ -352,7 +389,8 @@ keymap = {
         "bracket-matcher:remove-matching-brackets"
     ),
     "select in quotes": command("expand-selection-quotes"),
-    "quinn" + "({})".format(" | ".join(snippets.keys())): code_snippet,
+    "quinn {atom.snippets}": code_snippet,
+    "quinn {atom.snippets_with_formatter} [<dgndictation>]": code_snippet_with_formatter,
     # '({})'.format(' | '.join(snippets.keys())): code_snippet_naked,
     # python
     "quinn if": ["if :", Key("left")],
@@ -405,8 +443,20 @@ keymap = {
     "install packages": command("settings view install packages and themes"),
     # switch-header-source
     "switch [header] source": command("switch header source"),
+    # treeview
+    "(tree [view] rename | rename file)": command("tree view rename"),
+    # linter
+    "lint (next | neck)": command("linter ui default: next in current file"),
+    "lint (prev | previous)": command("linter ui default: previous in current file"),
+    # atom-isort
+    "sort imports": command("atom isort sort imports"),
+    # editor
+    "move line up": command("editor: move line up"),
+    "move line down": command("editor: move line down"),
+    "move [current line] [to] line" + numerals: move_to_line,
 }
-
+ctx.set_list("snippets", set(snippets.keys()) - set(snippet_formatters.keys()))
+ctx.set_list("snippets_with_formatter", snippet_formatters.keys())
 ctx.keymap(keymap)
 
 """

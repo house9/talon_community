@@ -4,7 +4,8 @@ from talon.voice import Key, Context, Str, press
 from talon_init import TALON_HOME, TALON_PLUGINS, TALON_USER
 from talon import ctrl, ui
 
-from ..utils import parse_words, text, is_in_bundles, insert, load_config_json
+from ..utils import parse_words, text, is_in_bundles, insert
+from .. import config
 from ..misc.switcher import switch_app
 from ..bundle_groups import TERMINAL_BUNDLES
 
@@ -44,12 +45,13 @@ directory_shortcuts = {
     "up up up up": "../../../..",
     "up up up up up": "../../../../..",
     "home": "~",
+    "temp": "/tmp",
     "talon home": TALON_HOME,
     "talon user": TALON_USER,
     "talon plug-ins": TALON_PLUGINS,
     "talon community": "~/.talon/user/talon_community",
 }
-directory_shortcuts.update(load_config_json("directory_shortcuts.json"))
+directory_shortcuts.update(config.load_config_json("directory_shortcuts.json"))
 
 
 def cd_directory_shortcut(m):
@@ -57,13 +59,14 @@ def cd_directory_shortcut(m):
     insert(f"cd {directory}; ls")
     for _ in range(4):
         press("left")
+    press("enter")
 
 
 def name_directory_shortcuts(m):
     insert(directory_shortcuts[" ".join(m["terminal.directory_shortcuts"])])
 
 
-servers = load_config_json("servers.json")
+servers = config.load_config_json("servers.json")
 
 
 def get_server(m):
@@ -100,13 +103,12 @@ keymap = {
     "clear back": Key("ctrl-u"),
     "clear line": [Key("ctrl-e"), Key("ctrl-u")],
     "(pain new | split vertical)": Key("cmd-d"),
-    "new {global_terminal.servers}": new_server,
+    "new [S S H] [tab] {global_terminal.servers}": new_server,
     # talon
     "tail talon": "tail -f ~/.talon/talon.log",
     "talon reple": "~/.talon/bin/repl",
-    # some habits die hard
-    "troll char": Key("ctrl-c"),
     "reverse": Key("ctrl-r"),
+    "rerun": [Key("up"), Key("enter")],
     "cd": ["cd ; ls", Key("left"), Key("left"), Key("left"), Key("left")],
     "cd wild": [
         "cd **; ls",
@@ -141,6 +143,7 @@ keymap = {
     ],
     "pseudo shut down now": "sudo shutdown now",
     "shell C H mod": "chmod ",
+    "shell (make executable | add executable permissions)": "chmod a+x ",
     "shell clear": [Key("ctrl-c"), "clear\n"],
     "shell copy [<dgndictation>]": ["cp ", text],
     "shell copy (recursive | curse) [<dgndictation>]": ["cp -r", text],
@@ -162,7 +165,7 @@ keymap = {
     "shell X args [<dgndictation>]": ["xargs ", text],
     "shell mosh": "mosh ",
     "[shell] mosh {global_terminal.servers}": mosh_servers,
-    "[shell] S S H {global_terminal.servers}": ssh_servers,
+    "[shell] (S S H | SSH) {global_terminal.servers}": ssh_servers,
     # "shell server {terminal.servers}": name_servers,
     "[shell] S S H copy I D {global_terminal.servers}": ssh_copy_id_servers,
     "shell M player": "mplayer ",
@@ -172,6 +175,8 @@ keymap = {
     "shell tail follow": "tail -f ",
     "shall count lines": "wc -l ",
     "shell L S U S B": "lsusb",
+    "shell net stat": "netstat -l ",
+    "W get": "wget ",
     # python
     "create virtual environment": ["virtualenv -p python3 venv", Key("enter")],
     "activate virtual environment": [
@@ -186,19 +191,21 @@ keymap = {
     # Tools
     # "(grep | grip)": ["grep  .", Key("left left")],
     "(grep | grip)": "grep ",
-    # "gripper": ["grep -r  .", Key("left left")],
+    "gripper": ["grep -r  .", Key("left left")],
     "pee socks": "ps aux ",
     "vi": "vi ",
-    # python
-    "pip": "pip",
-    "pip install": "pip install ",
-    "pip install requirements": "pip install -r ",
-    "pip install editable": "pip install -e ",
-    "pip install this": "pip install -e .",
-    "pip install local": "pip install -e .",
-    "pip [install] upgrade": "pip install --upgrade ",
-    "pip uninstall": "pip uninstall ",
-    "pip list": "pip list",
+    # docker
+    "docker P S": "docker ps ",
+    "docker (remove | R M)": "docker rm ",
+    "docker stop": "docker stop ",
+    "docker run": "docker run ",
+    "docker exec": "docker exec ",
+    "docker logs": "docker logs ",
+    "docker shell": ["docker exec -it  bash"] + [Key("left")] * 5,
+    "docker shell P X 4": ["docker exec -it px4simulator bash"] + [Key("left")] * 5,
+    "docker compose up": "docker-compose up ",
+    "docker compose down": "docker-compose down ",
+    "docker detach": [Key("ctrl-p"), Key("ctrl-q")],
     # kubectl
     KUBERNETES_PREFIX + "control": "kubectl ",
     KUBERNETES_PREFIX + "create": "kubectl create ",
@@ -255,7 +262,69 @@ keymap = {
     # other
     "shell make": "make\n",
     "shell jobs": "jobs\n",
+    # gsutil
+    "G S you till acl": "gsutil acl ",
+    "G S you till bucketpolicyonly": "gsutil bucketpolicyonly ",
+    "G S you till cat": "gsutil cat ",
+    "G S you till compose": "gsutil compose ",
+    "G S you till config": "gsutil config ",
+    "G S you till cors": "gsutil cors ",
+    "G S you till cp": "gsutil cp ",
+    "G S you till defacl": "gsutil defacl ",
+    "G S you till defstorageclass": "gsutil defstorageclass ",
+    "G S you till D U": "gsutil du ",
+    "G S you till hash": "gsutil hash ",
+    "G S you till help": "gsutil help ",
+    "G S you till I am": "gsutil iam ",
+    "G S you till K M S": "gsutil kms ",
+    "G S you till label": "gsutil label ",
+    "G S you till lifecycle": "gsutil lifecycle ",
+    "G S you till logging": "gsutil logging ",
+    "G S you till L S": "gsutil ls ",
+    "G S you till M B": "gsutil mb ",
+    "G S you till move": "gsutil mv ",
+    "G S you till notification": "gsutil notification ",
+    "G S you till perfdiag": "gsutil perfdiag ",
+    "G S you till rb": "gsutil rb ",
+    "G S you till requesterpays": "gsutil requesterpays ",
+    "G S you till retention": "gsutil retention ",
+    "G S you till rewrite": "gsutil rewrite ",
+    "G S you till rm": "gsutil rm ",
+    "G S you till rsync": "gsutil rsync ",
+    "G S you till setmeta": "gsutil setmeta ",
+    "G S you till signurl": "gsutil signurl ",
+    "G S you till stat": "gsutil stat ",
+    "G S you till test": "gsutil test ",
+    "G S you till update": "gsutil update ",
+    "G S you till version": "gsutil version ",
+    "G S you till versioning": "gsutil versioning ",
+    "G S you till web": "gsutil web ",
+    # rostopic
+    "ross topic bandwidth": "rostopic bw ",
+    "ross topic delay  ": "rostopic delay ",
+    "ross topic echo   ": "rostopic echo ",
+    "ross topic find   ": "rostopic find ",
+    "ross topic hertz  ": "rostopic hz ",
+    "ross topic info   ": "rostopic info ",
+    "ross topic list   ": "rostopic list ",
+    "ross topic pub    ": "rostopic pub ",
+    "ross topic type   ": "rostopic type ",
 }
+
+for pip in ("pip", "pip3"):
+    keymap.update(
+        {
+            f"{pip}": f"{pip}",
+            f"{pip} install": f"{pip} install ",
+            f"{pip} install requirements": f"{pip} install -r ",
+            f"{pip} install editable": f"{pip} install -e ",
+            f"{pip} install this": f"{pip} install -e .",
+            f"{pip} install local": f"{pip} install -e .",
+            f"{pip} [install] upgrade": f"{pip} install --upgrade ",
+            f"{pip} uninstall": f"{pip} uninstall ",
+            f"{pip} list": f"{pip} list",
+        }
+    )
 
 for action in ("get", "delete", "describe"):
     for object in (
